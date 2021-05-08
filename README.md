@@ -10,7 +10,10 @@ Require: upload your stock portfoil in a csv format (template available to downl
 Current Earning: _Gains from selling the stock - Spend from buying the stock_
 - Definination: from your bank account point, how much you have gained/loss currently? 
 - if you still hold a large amoun of shares, this number can be negative 
-- Pros: this shows how much "cash" you have in each stock
+- Pros: 
+  - when this number of negative, it shows how much value your remaining shares need to have to break even 
+  - when this number is positive: it shows you already making money 
+  - this also shows how much "cash" you have in each stock (negative)
 
 Total Earning: _Current Earning + Values of holding shares (at today's price)_
 - Defintion: your revenue (including the value of your stocks)
