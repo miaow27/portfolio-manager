@@ -1,5 +1,8 @@
 # profolio-manager
 
+https://share.streamlit.io/miaow27/profolio-manager/app.py
+
+
 A simple tool to help stock investors to understand their portfolio status. 
 
 Require: upload your stock portfoil in a csv format (template available to download). 
