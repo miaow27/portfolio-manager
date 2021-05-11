@@ -280,7 +280,7 @@ def get_stock_price_today(stock_list):
             url = 'https://api.polygon.io/v2/aggs/ticker/' + s + '/prev?unadjusted=true&apiKey=' + key
             try:
                 p[i] = float(ses.get(url).json()['results'][0]['c']) # closing price
-                successful_s += s + ','
+                successful_s += s + ', '
             except:
                 pass
             i = i + 1
