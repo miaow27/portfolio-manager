@@ -4,7 +4,7 @@ from io import StringIO
 import pandas as pd 
 import numpy as np
 import plotly.graph_objects as go
-from functions import check_upload_file, download_link_sample, download_link_summary, get_stock_sample, Portfolio, beautiful_tbl
+from functions import check_upload_file, download_link_sample, download_link_summary, get_stock_sample, Portfolio, beautiful_tbl, get_stock_price_today
 
 st.markdown('# Step 1: Upload your Stock Portfolio')
 st.markdown('Note: it has to follow a certain format. Please download our template below')
@@ -35,21 +35,39 @@ else:
 p = Portfolio(dataframe)
 p.cln()
 p.summarize()
+p.latest_buy()
 stock_lists = p.tot['stock'].unique()
 stock_price = {}
 
-st.sidebar.write('Stock Price Today')
-for s in stock_lists:
-    default_val = p.portfolio[p.portfolio['stock'] == s]['price'].round().max()
+stock_price_today, message = get_stock_price_today(stock_lists)
+st.sidebar.markdown('### Stock Price Today')
+st.sidebar.write('Stock successfuly get from Polygon API: ', message)
+st.sidebar.write('Default is first tried to get from API then with maxium of your data')
+for i in range(len(stock_lists)):
+    s = stock_lists[i]
+    default_val = stock_price_today[i]
+    if default_val == 0:
+        default_val = p.portfolio[p.portfolio['stock'] == s]['price'].round().max()
     v = st.sidebar.text_input(label = s, value = default_val)
     stock_price.update({s:float(v)})
 
 st.markdown('# Step 2: Portfolio Summary')
-st.markdown(download_link_summary({'overall':p.tot,'buy':p.buy, 'sell':p.sell}), unsafe_allow_html=True)
+st.markdown(download_link_summary({'overall':p.summarize_value(stock_price), 
+                                   'price-change':p.price_change(stock_price),
+                                   'overall-raw':p.tot,
+                                   'buy':p.buy, 
+                                   'sell':p.sell}), unsafe_allow_html=True)
+
+st.markdown('## % Price Change')
+st.plotly_chart(beautiful_tbl(p.price_change(stock_price), 
+                col_name = ['Stock', 'Price Today', 'Latest Buy Date','Price Latest Buy', 'Share Latest Buy', 'Price Avg Buy', 'Share Total Buy', '% Price Latest Buy', '% Price Avg Buy'],
+                col_width = 100, row_width = 40))
 
 st.markdown('## Overall Summary')
 st.plotly_chart(beautiful_tbl(p.summarize_value(stock_price), 
                 col_name = ['Stock', 'Price Today', 'Remaining Shares', 'Current Earning', 'Remaining Share Values', 'Total Earning']))
+
+
 
 with st.beta_expander('Compare Buy and Sell:'):
     if st.checkbox('Shares'):

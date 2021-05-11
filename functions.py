@@ -6,7 +6,8 @@ from io import StringIO, BytesIO
 import base64
 from datetime import date
 import plotly.graph_objects as go
-
+import requests
+import json
 
 class Portfolio:
   
@@ -65,7 +66,33 @@ class Portfolio:
         val['total_earning'] = val['remain_shares_value'] + val['current_earning']
         
         return val.round(2)
-            
+    
+    def latest_buy(self):
+        # get latest buy-in price
+        l_buy = self.portfolio[self.portfolio['buy-sell'] < 0].copy()
+        l_buy['date'] = l_buy['date'].dt.date
+        l_buy = l_buy.merge(self.buy, left_on = ['stock', 'date'], right_on = ['stock', 'buy_date_max'])
+        l_buy = l_buy[['stock', 'date' ,'price', 'share']]
+        l_buy.columns = ['stock', 'latest_buy_date', 'latest_buy_price', 'latest_buy_share']
+        
+        self.latest_buy = l_buy
+    
+    
+    def price_change(self, STOCK_PRICE_DICT):
+        # compare pulged in price with (1) avg buy-in price (2) latest buy-in price
+        
+        p_change = pd.DataFrame(STOCK_PRICE_DICT.items()).rename(columns = {0:'stock',1:'today_price'})
+        p_change = pd.merge(p_change, self.latest_buy, on = ['stock'])
+        p_change = pd.merge(p_change, self.buy[['stock', 'buy_avg_price', 'buy_shares']], on = 'stock')  
+        
+        p_change['%change latest buy'] = (p_change['today_price'] - p_change['latest_buy_price'])/p_change['latest_buy_price']
+        p_change['%change avg buy'] = (p_change['today_price'] - p_change['buy_avg_price'])/p_change['buy_avg_price']
+        
+        p_change['%change latest buy'] = p_change['%change latest buy'].apply(lambda x: str(round(x*100, 1)) + '%')
+        p_change['%change avg buy'] = p_change['%change avg buy'].apply(lambda x: str(round(x*100, 1)) + '%')
+        
+        return p_change.round(2)
+        
 
     def what_if(self,
                 FOCUS_STOCK,
@@ -200,7 +227,7 @@ def download_link_summary(df_dict):
     return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="portfolio-summary.xlsx">Download Portfolio Summary file</a>'
 
 def beautiful_tbl(df, col_name=None, 
-    bgcolor = "LightSteelBlue", hd_color = 'royalblue'):
+    bgcolor = "LightSteelBlue", hd_color = 'royalblue', col_width = 90, row_width = 30):
     
     if col_name == None:
         col_name = df.columns
@@ -208,14 +235,14 @@ def beautiful_tbl(df, col_name=None,
         
     fig = go.Figure(data=[go.Table(
     columnorder = list(range(1, n+1)),
-    columnwidth = [90]*(n),
+    columnwidth = [col_width]*(n),
     header = dict(
         values = col_name,
         line_color='darkslategray',
         fill_color=hd_color,
         align=['left','center'],
         font=dict(color='white', size=15),
-        height=40
+        height=row_width+15
     ),
     cells=dict(
         values=df.T.values,
@@ -223,14 +250,41 @@ def beautiful_tbl(df, col_name=None,
         fill=dict(color=['paleturquoise', 'white']),
         align=['left', 'center'],
         font_size=15,
-        height=30)
+        height=row_width)
         )
     ])
-    h = 30*(df.shape[0]) + 40*1.5 + 20
-    if (1.5 + n) *90 < 700:
-        w = (1.5 + n) *90
+    h = row_width *(df.shape[0]) + (row_width + 15) *1.5 + 20
+    if (1.5 + n) * col_width < 1000:
+        w = (1.5 + n) * col_width
     else:
-        w = 700
+        w = 1000
     fig.update_layout(height = h, width = w, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor=bgcolor)
     
     return fig
+
+
+
+# api key: qiwvnAkCH9kez5KSxaticnXPcwoczKjh
+
+def get_stock_price_today(stock_list):
+    
+    key = "qiwvnAkCH9kez5KSxaticnXPcwoczKjh"
+    
+    p = [0] * len(stock_list)
+    i = 0
+    successful_s = ''
+
+    with requests.Session() as ses:
+        for s in stock_list:
+            s = s.strip().upper()
+            url = 'https://api.polygon.io/v2/aggs/ticker/' + s + '/prev?unadjusted=true&apiKey=' + key
+            try:
+                p[i] = float(ses.get(url).json()['results'][0]['c']) # closing price
+                successful_s += s + ','
+            except:
+                pass
+            i = i + 1
+            
+    return p, successful_s
+        
+
