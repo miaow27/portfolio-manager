@@ -8,7 +8,7 @@ from functions import check_upload_file, download_link_sample, download_link_sum
 
 st.markdown('# Step 1: Upload your Stock Portfolio')
 st.markdown('Note: it has to follow a certain format. Please download our template below')
-st.markdown(download_link_sample({'template': get_stock_sample()}), unsafe_allow_html=True)
+st.markdown(download_link_sample(get_stock_sample()), unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("Upload your Stock Portfolio")
 

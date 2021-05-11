@@ -179,14 +179,15 @@ def to_excel(df_dict):
     processed_data = output.getvalue()
     return processed_data
 
-def download_link_sample(df_dict):
+def download_link_sample(df):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
     in:  dataframe dict
     out: href string
     """
-    val = to_excel(df_dict)
-    b64 = base64.b64encode(val)
-    return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="portfolio-sample.xlsx">Download Portfolio Sample file</a>'
+    csv = df.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
+    href = f'<a href="data:file/csv;base64,{b64}">Download csv file</a>'
+    return href
 
 def download_link_summary(df_dict):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
