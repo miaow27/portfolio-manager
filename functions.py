@@ -184,7 +184,7 @@ def download_link_sample(df):
     in:  dataframe dict
     out: href string
     """
-    csv = df.to_csv().encode()
+    csv = df.to_csv(index = False).encode()
     b64 = base64.b64encode(csv).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="portfolio-sample.csv" target="_blank">Download Template csv file</a>'
 
