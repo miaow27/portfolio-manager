@@ -1,7 +1,7 @@
 # profolio-manager
 
-https://share.streamlit.io/miaow27/profolio-manager/app.py
-
+- APPS :computer: https://share.streamlit.io/miaow27/portfolio-manager/app.py
+- BLOG :page_with_curl:
 
 A simple tool to help stock investors to understand their portfolio status. 
 
