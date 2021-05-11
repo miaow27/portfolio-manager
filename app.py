@@ -60,9 +60,10 @@ st.markdown(download_link_summary({'overall':p.summarize_value(stock_price),
 
 st.markdown('## % Price Change')
 st.plotly_chart(beautiful_tbl(p.price_change(stock_price), 
-                col_name = ['Stock', 'Price Today', 'Latest Buy Date','Price Latest Buy', 'Share Latest Buy', 'Price Avg Buy', 'Share Total Buy', '% Price Latest Buy', '% Price Avg Buy'],
+                col_name = ['Stock', 'Price Today' ,'Price Latest Buy', '% Price Latest Buy', 
+                            'Price Avg Buy', '% Price Avg Buy', 'Share Latest Buy', 'Share Total Buy'],
                 col_width = 100, row_width = 40))
-
+                             
 st.markdown('## Overall Summary')
 st.plotly_chart(beautiful_tbl(p.summarize_value(stock_price), 
                 col_name = ['Stock', 'Price Today', 'Remaining Shares', 'Current Earning', 'Remaining Share Values', 'Total Earning']))

@@ -91,6 +91,9 @@ class Portfolio:
         p_change['%change latest buy'] = p_change['%change latest buy'].apply(lambda x: str(round(x*100, 1)) + '%')
         p_change['%change avg buy'] = p_change['%change avg buy'].apply(lambda x: str(round(x*100, 1)) + '%')
         
+        p_change = p_change[['stock',  'today_price', 'latest_buy_price', '%change latest buy',
+                             'buy_avg_price', '%change avg buy', 'latest_buy_share', 'buy_shares']]
+        
         return p_change.round(2)
         
 
