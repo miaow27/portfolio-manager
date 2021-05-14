@@ -56,7 +56,7 @@ class Portfolio:
             p = get_api_stock_price_previous_close(row['stock'], row['stock_type'])
             stock_price.update({row['stock']:p})
         
-        self.price = stock_price
+        self.stock_price = stock_price
 
     def summarize(self):
         # get total bought/seld shared, avg price
