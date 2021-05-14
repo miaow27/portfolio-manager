@@ -168,7 +168,7 @@ def get_stock_sample():
 
     return pd.read_csv(StringIO(
         '''
-        Stock,Date,Buy(-1) / Sell (1),Price per Share,Share
+        Crypto, Stock,Date,Buy(-1) / Sell (1),Price per Share,Share
         1, BTC,4/20/2021,-1,56219.22,0.08895382
         1, BTC,4/26/2021,-1,53574.24,0.01866335
         1, BTC,4/27/2021,1,54964.71,0.00909675
