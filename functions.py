@@ -8,6 +8,28 @@ from datetime import date
 import plotly.graph_objects as go
 import requests
 import json
+import re
+
+def get_api_stock_price_previous_close(s, type = 'stock'):
+  
+    key = "qiwvnAkCH9kez5KSxaticnXPcwoczKjh"
+
+    with requests.Session() as ses:
+        s = s.replace('-', '').strip().upper()
+
+        if type == 'crypto':
+            if re.search('USD', s):
+                s = 'X:' + s
+            else:
+                s = 'X:' + s + 'USD'
+        print(s)
+        url = 'https://api.polygon.io/v2/aggs/ticker/' + s + '/prev?unadjusted=true&apiKey=' + key
+        p = 0
+        try:
+            p = float(ses.get(url).json()['results'][0]['c']) # closing price
+        except:
+            pass
+    return p
 
 class Portfolio:
   
@@ -17,12 +39,24 @@ class Portfolio:
     def cln(self):
         # clean up raw files
         df = self.raw_portfolio.copy()
-        df.columns = ['stock', 'date', 'buy-sell', 'price', 'share']
+        df.columns = ['crypto', 'stock', 'date', 'buy-sell', 'price', 'share']
         df['date'] = pd.to_datetime(df['date'])
-        df[['buy-sell', 'price', 'share']] = df[['buy-sell', 'price', 'share']].astype(float)
+        df[['crypto', 'buy-sell', 'price', 'share']] = df[['crypto', 'buy-sell', 'price', 'share']].astype(float)
         df['share-sign'] = df['share'] * df['buy-sell'] * (-1)
         df['earning'] = df['share'] * df['price'] * df['buy-sell']
+        df['stock_type'] = df['crypto'].apply(lambda x: 'crypto' if x == 1 else 'stock')
         self.portfolio = df
+        
+    def get_stock_price(self):
+        # try to get price from API
+        stock_price = {}
+        s_list = self.portfolio[['stock', 'stock_type']].drop_duplicates()
+        
+        for index, row in s_list.iterrows():
+            p = get_api_stock_price_previous_close(row['stock'], row['stock_type'])
+            stock_price.update({row['stock']:p})
+        
+        self.price = stock_price
 
     def summarize(self):
         # get total bought/seld shared, avg price
@@ -67,33 +101,28 @@ class Portfolio:
         
         return val.round(2)
     
-    def latest_buy(self):
-        # get latest buy-in price
-        l_buy = self.portfolio[self.portfolio['buy-sell'] < 0].copy()
-        l_buy['date'] = l_buy['date'].dt.date
-        l_buy = l_buy.merge(self.buy, left_on = ['stock', 'date'], right_on = ['stock', 'buy_date_max'])
-        l_buy = l_buy[['stock', 'date' ,'price', 'share']]
-        l_buy.columns = ['stock', 'latest_buy_date', 'latest_buy_price', 'latest_buy_share']
+    def stock_return(self, STOCK_PRICE_DICT):
+        # return = total earing / total biu 
         
-        self.latest_buy = l_buy
+        rt = pd.DataFrame(STOCK_PRICE_DICT.items()).rename(columns = {0:'stock',1:'today_price'})
+        rt = pd.merge(rt, self.tot[['stock', 'remain_shares', 'current_earning']])
+        rt = pd.merge(rt, self.buy[['stock', 'buy_value']])
+        rt['return ratio'] = rt['current_earning'] / rt['buy_value']
+        rt = rt[['stock', 'remain_shares', 'buy_value', 'current_earning', 'return ratio']]
+
+        return rt.round(3)
     
     
     def price_change(self, STOCK_PRICE_DICT):
         # compare pulged in price with (1) avg buy-in price (2) latest buy-in price
         
         p_change = pd.DataFrame(STOCK_PRICE_DICT.items()).rename(columns = {0:'stock',1:'today_price'})
-        p_change = pd.merge(p_change, self.latest_buy, on = ['stock'])
         p_change = pd.merge(p_change, self.buy[['stock', 'buy_avg_price', 'buy_shares']], on = 'stock')  
         
-        p_change['%change latest buy'] = (p_change['today_price'] - p_change['latest_buy_price'])/p_change['latest_buy_price']
         p_change['%change avg buy'] = (p_change['today_price'] - p_change['buy_avg_price'])/p_change['buy_avg_price']
-        
-        p_change['%change latest buy'] = p_change['%change latest buy'].apply(lambda x: str(round(x*100, 1)) + '%')
         p_change['%change avg buy'] = p_change['%change avg buy'].apply(lambda x: str(round(x*100, 1)) + '%')
         
-        p_change = p_change[['stock',  'today_price', 'latest_buy_price', '%change latest buy',
-                             'buy_avg_price', '%change avg buy', 'latest_buy_share', 'buy_shares']]
-        
+        p_change = p_change[['stock',  'today_price', 'buy_avg_price', '%change avg buy', 'buy_shares']]
         return p_change.round(2)
         
 
@@ -127,14 +156,6 @@ class Portfolio:
                 'total earning': [p*N*n_prop + Y for p in p_range]})
 
         result = reduce(lambda a, b: pd.DataFrame(a).append(pd.DataFrame(b)), result)
-        
-        
-        # fig = px.line(result, x='price', y='value', color='% remain-shares',       
-        #               title='STOCK = ' + FOCUS_STOCK + 'Sold Stock Values',  template='seaborn')
-        # if Y < 0:
-        #     fig.add_hline(y=-Y, line_width=3, line_dash="dash", line_color="grey")
-        # fig.show()
-        
 
         fig = px.line(result, x='price', y='total earning', color='% remain-shares',title=FOCUS_STOCK + ' - Total Earning', template='seaborn')
         if result['total earning'].min()* result['total earning'].max() < 0:
@@ -148,54 +169,62 @@ def get_stock_sample():
     return pd.read_csv(StringIO(
         '''
         Stock,Date,Buy(-1) / Sell (1),Price per Share,Share
-        BTC,4/20/2021,-1,56219.22,0.08895382
-        BTC,4/26/2021,-1,53574.24,0.01866335
-        BTC,4/27/2021,1,54964.71,0.00909675
-        BTC,5/4/2021,1,54691.62,0.0182818
-        DODGE,4/19/2021,-1,0.380287,1315
-        DODGE,4/25/2021,-1,0.260847,766
-        DODGE,5/4/2021,1,0.528122,947
-        DODGE,5/4/2021,1,0.530023,941
-        COUR,4/1/2021,-1,45.5,21.97812
-        COUR,4/1/2021,-1,51.93,20.130406
-        COUR,4/12/2021,-1,50.88,19.65412
-        COUR,4/16/2021,-1,46.08,30
-        COUR,4/26/2021,1,48.72,20
-        COUR,5/4/2021,1,45.5,20
+        1, BTC,4/20/2021,-1,56219.22,0.08895382
+        1, BTC,4/26/2021,-1,53574.24,0.01866335
+        1, BTC,4/27/2021,1,54964.71,0.00909675
+        1, BTC,5/4/2021,1,54691.62,0.0182818
+        1, DOGE,4/19/2021,-1,0.380287,1315
+        1, DOGE,4/25/2021,-1,0.260847,766
+        1, DOGE,5/4/2021,1,0.528122,947
+        1, DOGE,5/4/2021,1,0.530023,941
+        0, COUR,4/1/2021,-1,45.5,21.97812
+        0, COUR,4/1/2021,-1,51.93,20.130406
+        0, COUR,4/12/2021,-1,50.88,19.65412
+        0, COUR,4/16/2021,-1,46.08,30
+        0, COUR,4/26/2021,1,48.72,20
+        0, COUR,5/4/2021,1,45.5,20
         '''
     ))
 
 
 def check_upload_file(df):
 
-    cols = ['stock', 'date', 'buy-sell', 'price', 'share']
+    cols = ['crypto', 'stock', 'date', 'buy-sell', 'price', 'share']
     message = ''
 
-    if df.shape[1] != 5:
-        message += 'Fail: your data should have exactly 5 columns (stock, date, buy-sell, price, share)\n'
-
+    if df.shape[1] != 6:
+        message += 'Fail: your data should have exactly 6 columns (crypto, stock, date, buy-sell, price, share)\n'
+        
     try:
-        pd.to_datetime(df.iloc[:, 1])
-    except:
-        message += 'Fail: your second column should be a valid date format' + '\n'
-
-    try:
-        if df.iloc[:, 2].abs().max() == 1:
+        if (df.iloc[:, 0].abs().max() == 1) & (df.iloc[:, 0].abs().min() == 0):
             pass
         else:
-            message += 'Fail: your thrid column should only have 1, -1 (1 for buy, -1 for sell)' + '\n'
+            message += 'Fail: your first column should only have 0, 1 (0 for stock, 1 for crypto currency)' + '\n'
     except:
-        message += 'Fail: your thrid column should only have 1, -1 (1 for buy, -1 for sell)' + '\n'
+        message += 'Fail: your first column should only have 0, 1 (0 for stock, 1 for crypto currency)' + '\n'
 
     try:
-        df.iloc[:, 3].astype(float)
+        pd.to_datetime(df.iloc[:, 2])
     except:
-        message += 'Fail: your fourth column should be a numeric format for the stock price (per share)' + '\n'
+        message += 'Fail: your third column should be a valid date format' + '\n'
+
+    try:
+        if df.iloc[:, 3].abs().max() == 1:
+            pass
+        else:
+            message += 'Fail: your fourth column should only have 1, -1 (1 for buy, -1 for sell)' + '\n'
+    except:
+        message += 'Fail: your fourth column should only have 1, -1 (1 for buy, -1 for sell)' + '\n'
 
     try:
         df.iloc[:, 4].astype(float)
     except:
-        message += 'Fail: your fifth column should be a numeric format for number of shares' + '\n'
+        message += 'Fail: your fifth column should be a numeric format for the stock price (per share)' + '\n'
+
+    try:
+        df.iloc[:, 5].astype(float)
+    except:
+        message += 'Fail: your sixth column should be a numeric format for number of shares' + '\n'
 
     return message
 
@@ -209,6 +238,7 @@ def to_excel(df_dict):
     processed_data = output.getvalue()
     return processed_data
 
+
 def download_link_sample(df):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
     in:  dataframe dict
@@ -220,6 +250,7 @@ def download_link_sample(df):
 
     return href
 
+
 def download_link_summary(df_dict):
     """Generates a link allowing the data in a given panda dataframe to be downloaded
     in:  dataframe
@@ -228,6 +259,7 @@ def download_link_summary(df_dict):
     val = to_excel(df_dict)
     b64 = base64.b64encode(val)
     return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="portfolio-summary.xlsx">Download Portfolio Summary file</a>'
+
 
 def beautiful_tbl(df, col_name=None, 
     bgcolor = "LightSteelBlue", hd_color = 'royalblue', col_width = 90, row_width = 30):
@@ -264,30 +296,3 @@ def beautiful_tbl(df, col_name=None,
     fig.update_layout(height = h, width = w, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor=bgcolor)
     
     return fig
-
-
-
-# api key: qiwvnAkCH9kez5KSxaticnXPcwoczKjh
-
-def get_stock_price_today(stock_list):
-    
-    key = "qiwvnAkCH9kez5KSxaticnXPcwoczKjh"
-    
-    p = [0] * len(stock_list)
-    i = 0
-    successful_s = ''
-
-    with requests.Session() as ses:
-        for s in stock_list:
-            s = s.strip().upper()
-            url = 'https://api.polygon.io/v2/aggs/ticker/' + s + '/prev?unadjusted=true&apiKey=' + key
-            try:
-                p[i] = float(ses.get(url).json()['results'][0]['c']) # closing price
-                successful_s += s + ', '
-            except:
-                pass
-            i = i + 1
-            
-    return p, successful_s
-        
-
