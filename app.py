@@ -37,13 +37,13 @@ p.cln()
 p.get_stock_price()
 p.summarize()
 stock_lists = p.tot['stock'].unique()
-stock_price = p.stock_price()
+stock_price = p.stock_price
 
 
 st.sidebar.markdown('### Stock Price Today')
 for k, v in stock_price.items():
     v = st.sidebar.text_input(label = k, value = v)
-    stock_price.update({s:float(v)})
+    stock_price.update({k:float(v)})
 
 st.markdown('# Step 2: Portfolio Summary')
 st.markdown(download_link_summary({'overall':p.summarize_value(stock_price), 
@@ -58,7 +58,7 @@ st.plotly_chart(beautiful_tbl(p.summarize_value(stock_price),
                 col_name = ['Stock', 'Price Today', 'Remaining Shares', 'Current Earning', 'Remaining Share Values', 'Total Earning']))
 
 st.markdown('## Greenlight vs Redlight Stock')
-st.plotly_chart(beautiful_tbl(p.summarize_value(stock_price), 
+st.plotly_chart(beautiful_tbl(p.stock_return(stock_price), 
                 col_name = ['Stock', 'Remaining Shares', 'Total Invested', 'Current Earning', 'Return Ratio']))
 
 st.markdown('## Today Price vs Avg Price')
